@@ -4,6 +4,8 @@ import random
 import discord
 from discord.ext import commands
 from discord.ext.commands import Bot
+from discord.utils import get
+import youtube_dl
 from dotenv import load_dotenv
 
 import meta
@@ -69,6 +71,49 @@ async def on_member_join(member):
     role = discord.utils.get(member.guild.roles, id=718100764136046732)
     await member.add_roles(role)
     await channel.send(f'Пользователь {member.name} присоединился')
+
+
+@bot.command(name="play")
+@commands.has_role("everyone")
+async def play(ctx, url: str):
+    global name
+    if_song = os.path.isfile('song.mp3')
+
+    try:
+        if if_song:
+            os.remove('song.mp3')
+            print('[log] Старая песня удалена')
+    except PermissionError:
+        print('[log] Я не смог удалить песню')
+
+    await ctx.send('Ожидайте лютый кач')
+
+    voice = get(discord.client.voice_clients, guild=ctx.guild)
+    ydl_opt = {
+        'format': 'bestaudio/best',
+        'postprocessors': [{
+            'key': 'FFmpegExctractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '192'
+        }],
+    }
+    with youtube_dl.YoutubeDL(ydl_opt) as ydl:
+        print('[log] Гружу музыку')
+        ydl.download([url])
+
+    for file in os.listdir('./'):
+        if file.endswith('.mp3'):
+            name = file
+            os.rename(file, 'song.mp3')
+
+        voice.play(discord.FFmpegPCMAudio('song.mp3'),
+                   after=lambda e: print(f'[log] {name}, Музыка все, выбирай новую'))
+        voice.src = discord.PCMVolumeTransformer(voice.src)
+        voice.src.volume = 0.07
+        song_name = name.rsplit('_', 2)
+        await ctx.send(f'Сейчас играет: {song_name[0]}')
+
+
 
 if __name__ == "__main__":
     bot.run(TOKEN)
